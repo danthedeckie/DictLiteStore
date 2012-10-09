@@ -129,7 +129,6 @@ class DictLiteStore(object):
             self.table_name, \
             'WHERE' if len(args) != 0 else '', \
             ' AND '.join(where_clauses))
-        print (sql)
         # Order by value gets tacked on the end:
         sql_values.append(clean(_options['order']))
 
@@ -137,7 +136,10 @@ class DictLiteStore(object):
         data = [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]
         for doc in data:
             for k,v in doc.items():
-                doc[k] = json.loads(v)
+                if v == None:
+                    del doc[k]
+                else:
+                    doc[k] = json.loads(v)
 
         # Return the newly parsed data:
         return data
