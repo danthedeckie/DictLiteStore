@@ -20,6 +20,7 @@ straight.  Or SQLalchemy or something.
 """
 
 import sqlite3 as lite
+import json
 
 # These are the allowed operators for select()
 _where_operators = [
@@ -72,12 +73,23 @@ class DictLiteStore(object):
         # Commit new columns:
         self.db.commit()
 
+        # Prepare the data for writing.
+        # *NOTE* this is lossy.  Un-jsonable data will simply
+        #        be dropped into it's string version!
+        safe_values = []
+        for x in doc.values():
+            try:
+                safe_values.append(json.dumps(x))
+            except TypeError:
+                safe_values.append(json.dumps(str(x)))
+
+
         # Now finally add the data into the database:
         sql = "INSERT INTO {0}({1}) VALUES({2})".format( \
                     self.table_name, \
                     ','.join(columns), \
                     ','.join(data_spaces))
-        self.cur.execute(sql, [str(x) for x in doc.values()])
+        self.cur.execute(sql, safe_values)
 
 
 
@@ -121,7 +133,11 @@ class DictLiteStore(object):
         # Order by value gets tacked on the end:
         sql_values.append(clean(_options['order']))
 
-        # Run the query, and return the result(s).
-        return [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]
+        # Run the query, and parse the result(s).
+        data = [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]
+        for doc in data:
+            for k,v in doc.items():
+                doc[k] = json.loads(v)
 
-
+        # Return the newly parsed data:
+        return data
