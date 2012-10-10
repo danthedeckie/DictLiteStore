@@ -1,6 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+
 """
+DictLiteStore.py
+(C) 2012 Daniel Fairhead
+
 A Very simple module for storing schemaless / quasi-random dictionaries into a
-sqllite store.
+sqllite store. All values are stored as json in the database, which means it's
+still very easy to parse & query.
 
 Usage:
 
@@ -10,14 +17,19 @@ Usage:
 1
 
 Now the dictionary 'foo' is stored as a row in data.db
+You can either use SQLlite queries directly to access the data,
+or there is a very simple select wrapper which can be helpful for simple
+stuff:
 
 >>> bucket.select(('title','LIKE','%Foo%'))
 [{'title':'Foo the first','dict':'Bar Bar Bar'}]
 
-Returns things reasonably easily.  For more complex queries, just use sqllite
-straight.  Or SQLalchemy or something.
 
 """
+
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 import sqlite3 as lite
 import json
@@ -34,22 +46,26 @@ _where_operators = [
 
 def clean(unclean):
     ''' Makes a string safe to use as a column name in a SQLlite query.'''
-    return unclean.translate(None, '\'"`;=!{}[]-+*&^\\%$@()')
+    return u'"' + unicode(unclean.replace('"','""')) + u'"'
 
 
 class DictLiteStore(object):
 
-    def __init__(self, db_name=":memory:", table_name="def"):
+    def __enter__(self, db_name=":memory:", table_name=u"def"):
         self.db = lite.connect(db_name)
         self.db.row_factory = lite.Row
         self.cur = self.db.cursor()
         self.table_name = clean(table_name)
 
-        self.cur.execute("CREATE TABLE IF NOT EXISTS {0}(Id INT)".format(self.table_name))
+        self.cur.execute(u"CREATE TABLE IF NOT EXISTS {0}(Id INT)".format(self.table_name))
         self.db.commit()
 
         self.sql_columns = []
+        return self
 
+    def __exit__(self, exptype, expvalue, exptb):
+        self.db.commit()
+        self.db.close()
 
     def store(self, doc):
         '''
@@ -63,13 +79,14 @@ class DictLiteStore(object):
             k = clean(_k)
             # If needed, add a new column to the self.db:
             if not k in self.sql_columns:
-                sql = "ALTER TABLE {0} " \
-                      "ADD COLUMN {1}".format(self.table_name, k)
+                sql = u"ALTER TABLE {0} " \
+                      u"ADD COLUMN {1}".format(self.table_name, k)
+                print sql
                 self.cur.execute(sql)
                 self.sql_columns.append(k)
             # Add this item to the list of stuff to commit:
             columns.append(k)
-            data_spaces.append('?')
+            data_spaces.append(u'?')
         # Commit new columns:
         self.db.commit()
 
@@ -78,17 +95,14 @@ class DictLiteStore(object):
         #        be dropped into it's string version!
         safe_values = []
         for x in doc.values():
-            try:
-                safe_values.append(json.dumps(x))
-            except TypeError:
-                safe_values.append(json.dumps(str(x)))
+            safe_values.append(json.dumps(x, default=lambda x:unicode(x), ensure_ascii=False ))
 
 
         # Now finally add the data into the database:
-        sql = "INSERT INTO {0}({1}) VALUES({2})".format( \
+        sql = u"INSERT INTO {0}({1}) VALUES({2})".format( \
                     self.table_name, \
-                    ','.join(columns), \
-                    ','.join(data_spaces))
+                    u','.join(columns), \
+                    u','.join(data_spaces))
         self.cur.execute(sql, safe_values)
 
 
@@ -106,7 +120,7 @@ class DictLiteStore(object):
 
         '''
         # Work around python not liking *args before named args.
-        _options = {'order': 'mtime'}
+        _options = {u'order': u'mtime'}
         _options.update(vargs)
 
         ####
@@ -121,16 +135,16 @@ class DictLiteStore(object):
         for (col, operator, value) in args:
             if not operator in _where_operators:
                 raise KeyError, 'Invalid operator ({0})'.format(operator)
-            where_clauses.append(' '.join([clean(col), operator, '(?)']))
+            where_clauses.append(u' '.join([clean(col), unicode(operator), u'(?)']))
             sql_values.append(value)
 
         # Prepare the query:
-        sql = 'SELECT * FROM {0} {1} {2} ORDER BY ?'.format( \
+        sql = u'SELECT * FROM {0} {1} {2} ORDER BY ?'.format( \
             self.table_name, \
-            'WHERE' if len(args) != 0 else '', \
-            ' AND '.join(where_clauses))
+            u'WHERE' if len(args) != 0 else u'', \
+            u' AND '.join(where_clauses))
         # Order by value gets tacked on the end:
-        sql_values.append(clean(_options['order']))
+        sql_values.append(clean(_options[u'order']))
 
         # Run the query, and parse the result(s).
         data = [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]

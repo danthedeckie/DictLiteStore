@@ -1,18 +1,29 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+import sys
+reload(sys)
+sys.setdefaultencoding('utf_8')
+
 from DictLiteStore import DictLiteStore
 
 c = {'title':'complex','dict':{'this is a dict of dicts key':'with still good data'},
     'numbers':42,'lists':[1,1,2,3,5,8,13]}
 
-d = {'title':'foo', 'data':'bar'}
+d = {'title':'foo', 'data':'bar', 'name with space':'should work.',u'Ονομα':u'Αυτο unicode ειναι!'}
 
 e = {'title':'this is invalid data for json','splat':lambda x: x+x}
 
-s = DictLiteStore()
+x = []
+with DictLiteStore() as s, open('f.txt','w') as f:
 
-s.store(c)
-s.store(d)
-s.store(e)
+    s.store(c)
+    s.store(d)
+    s.store(e)
 
-print str(s.select())
+    print 'retreving data:'
+    x = s.select()
+    #print s.select()[1].encode('utf-8')
+    print s.select()[1]['Ονομα']
+    print 'dumping SQL:'
 
-print '\n'.join(s.db.iterdump())
+    print u'\n'.join([unicode(x) for x in s.db.iterdump()])
