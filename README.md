@@ -2,8 +2,37 @@
 # WORK IN PROGRESS
 
 A Very simple module for storing schemaless / quasi-random dictionaries into a
-sqllite store. All values are stored as json in the database, which means it's
-still very easy to parse & query.
+sqllite store. All values within the dict are stored as json values in the database,
+but the keys are mapped into table columns, So you can query things , while
+it's still very easy to parse.
+
+When you try to add a dict which has keys which *aren't* in the table
+already, it will automatically add those columns.
+
+So a dict:
+
+```python
+{'author': 'dan',
+ 'project': 'DictLiteStore',
+ 'categories': ['python', 'dict', 'persistance']
+}
+```
+
+becomes in the database:
+
+```
+AUTHOR | PROJECT          | CATEGORIES
+"dan"    "DictLiteStore"    "['python', 'dict', 'persistance']"
+```
+
+This is quite cool, as you can then use regular SQL to query stuff.
+
+
+```sql
+SELECT * FROM 'dict_store' WHERE 'author' == 'dan'
+```
+
+for instance.
 
 ##Usage:
 
