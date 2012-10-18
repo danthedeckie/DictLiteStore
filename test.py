@@ -9,12 +9,13 @@ from DictLiteStore import DictLiteStore
 c = {'title':'complex','dict':{'this is a dict of dicts key':'with still good data'},
     'numbers':42,'lists':[1,1,2,3,5,8,13]}
 
-d = {'title':'foo', 'data':'bar', 'name with space':'should work.',u'Ονομα':u'Αυτο unicode ειναι!'}
+d = {'not':'a','normal':'table'}
+#d = {'title':'foo', 'data':'bar', 'name with space':'should work.',u'Ονομα':u'Αυτο unicode ειναι!'}
 
 e = {'title':'this is invalid data for json','splat':lambda x: x+x}
 
 x = []
-with DictLiteStore() as s, open('f.txt','w') as f:
+with DictLiteStore('x.db') as s, open('f.txt','w') as f:
 
     s.store(c)
     s.store(d)
@@ -23,7 +24,7 @@ with DictLiteStore() as s, open('f.txt','w') as f:
     print 'retreving data:'
     x = s.select()
     #print s.select()[1].encode('utf-8')
-    print s.select()[1]['Ονομα']
+#    print s.select()[1]['Ονομα']
     print 'dumping SQL:'
 
     print u'\n'.join([unicode(x) for x in s.db.iterdump()])

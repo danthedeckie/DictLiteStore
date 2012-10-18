@@ -34,6 +34,20 @@ SELECT * FROM 'dict_store' WHERE 'author' == 'dan'
 
 for instance.
 
+Since the data is in json form, even for lists (like categories) you
+can fairly easily query it too.  Search for all rows with 'python' in
+categories, say.  Sqllite full-text searches are reasonably fast.
+You don't get the performance benefits of one-to-many relationship
+queries, but if you're in a performance critical environment, you
+should probably be looking at a 'real' SQL server anyway.
+
+
+When the data is returned from sqllite, if you use the
+'select' function in the DictLiteStore module, it will re-convert
+jsonified values (say that 'categories' list) back into a python
+list.  This is quite useful. :-)
+
+
 ##Usage:
 
 ```python

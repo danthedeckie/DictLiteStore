@@ -43,24 +43,42 @@ _where_operators = [
     '<','<=','>','>=',
     '=','==','!=','<>','IS','IS NOT','IN','LIKE','GLOB','MATCH','REGEXP']
 
-
 def clean(unclean):
-    ''' Makes a string safe to use as a column name in a SQLlite query.'''
+    ''' Makes a string safe (and unicode) to use as
+        a column name in a SQLlite query '''
+    return unicode(unclean.replace('"','""'))
+
+def cleanq(unclean):
+    ''' Cleans a string, and sticks quotes around it, for use in 
+        SQLlite queries. '''
     return u'"' + unicode(unclean.replace('"','""')) + u'"'
 
 
 class DictLiteStore(object):
 
-    def __enter__(self, db_name=":memory:", table_name=u"def"):
-        self.db = lite.connect(db_name)
-        self.db.row_factory = lite.Row
-        self.cur = self.db.cursor()
+    def __init__(self, db_name=":memory", table_name=u"def"):
+        self.db_name = db_name
         self.table_name = clean(table_name)
 
-        self.cur.execute(u"CREATE TABLE IF NOT EXISTS {0}(Id INT)".format(self.table_name))
+    def __enter__(self):
+        self.db = lite.connect(self.db_name)
+        self.db.row_factory = lite.Row
+        self.cur = self.db.cursor()
+
+        self.cur.execute(u"CREATE TABLE IF NOT EXISTS \"{0}\"(Id INT)".format(self.table_name))
         self.db.commit()
 
         self.sql_columns = []
+
+        # Get current columns:
+        self.cur.execute(u"PRAGMA table_info(\"{0}\")".format(self.table_name))
+
+        # Add them to the sql_columns list:
+        for row in self.cur.fetchall()[1:]:
+            self.sql_columns.append(row[1])
+
+        print str(self.sql_columns)
+
         return self
 
     def __exit__(self, exptype, expvalue, exptb):
@@ -79,13 +97,14 @@ class DictLiteStore(object):
             k = clean(_k)
             # If needed, add a new column to the self.db:
             if not k in self.sql_columns:
-                sql = u"ALTER TABLE {0} " \
-                      u"ADD COLUMN {1}".format(self.table_name, k)
-                print sql
+                print '{0} Not in {1}'.format(repr(k), str(self.sql_columns))
+                sql = u"ALTER TABLE \"{0}\" " \
+                      u"ADD COLUMN \"{1}\"".format(self.table_name, k)
+                #print sql
                 self.cur.execute(sql)
                 self.sql_columns.append(k)
             # Add this item to the list of stuff to commit:
-            columns.append(k)
+            columns.append(u'"' + k + u'"')
             data_spaces.append(u'?')
         # Commit new columns:
         self.db.commit()
@@ -99,7 +118,7 @@ class DictLiteStore(object):
 
 
         # Now finally add the data into the database:
-        sql = u"INSERT INTO {0}({1}) VALUES({2})".format( \
+        sql = u"INSERT INTO \"{0}\"({1}) VALUES({2})".format( \
                     self.table_name, \
                     u','.join(columns), \
                     u','.join(data_spaces))
@@ -135,16 +154,16 @@ class DictLiteStore(object):
         for (col, operator, value) in args:
             if not operator in _where_operators:
                 raise KeyError, 'Invalid operator ({0})'.format(operator)
-            where_clauses.append(u' '.join([clean(col), unicode(operator), u'(?)']))
+            where_clauses.append(u' '.join([cleanq(col), unicode(operator), u'(?)']))
             sql_values.append(value)
 
         # Prepare the query:
-        sql = u'SELECT * FROM {0} {1} {2} ORDER BY ?'.format( \
+        sql = u'SELECT * FROM \"{0}\" {1} {2} ORDER BY ?'.format( \
             self.table_name, \
             u'WHERE' if len(args) != 0 else u'', \
             u' AND '.join(where_clauses))
         # Order by value gets tacked on the end:
-        sql_values.append(clean(_options[u'order']))
+        sql_values.append(cleanq(_options[u'order']))
 
         # Run the query, and parse the result(s).
         data = [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]
