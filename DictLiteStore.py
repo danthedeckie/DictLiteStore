@@ -77,8 +77,6 @@ class DictLiteStore(object):
         for row in self.cur.fetchall()[1:]:
             self.sql_columns.append(row[1])
 
-        print str(self.sql_columns)
-
         return self
 
     def __exit__(self, exptype, expvalue, exptb):
@@ -97,10 +95,8 @@ class DictLiteStore(object):
             k = clean(_k)
             # If needed, add a new column to the self.db:
             if not k in self.sql_columns:
-                print '{0} Not in {1}'.format(repr(k), str(self.sql_columns))
                 sql = u"ALTER TABLE \"{0}\" " \
                       u"ADD COLUMN \"{1}\"".format(self.table_name, k)
-                #print sql
                 self.cur.execute(sql)
                 self.sql_columns.append(k)
             # Add this item to the list of stuff to commit:
