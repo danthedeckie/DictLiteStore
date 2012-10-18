@@ -53,8 +53,8 @@ list.  This is quite useful. :-)
 ```python
 
 foo = {'title':'Foo the first','dict':'Bar Bar Bar'}
-bucket = DictLiteStore('data.db','table_of_random_stuff')
-bucket.store(foo)
+with DictLiteStore('data.db','table_of_random_stuff') as bucket:
+    bucket.store(foo)
 
 ```
 
