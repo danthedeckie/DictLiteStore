@@ -22,17 +22,17 @@ becomes in the database:
 
 ```
 AUTHOR | PROJECT          | CATEGORIES
-"dan"    "DictLiteStore"    "['python', 'dict', 'persistance']"
+"dan"    "DictLiteStore"    ['python', 'dict', 'persistance']
 ```
 
 This is quite cool, as you can then use regular SQL to query stuff.
 
 
 ```sql
-SELECT * FROM 'dict_store' WHERE 'author' == 'dan'
+SELECT * FROM 'dict_store' WHERE 'author' == '"dan"'
 ```
 
-for instance.
+for instance. (Note the quotes around the query value.)
 
 Since the data is in json form, even for lists (like categories) you
 can fairly easily query it too.  Search for all rows with 'python' in

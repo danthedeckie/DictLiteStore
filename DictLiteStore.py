@@ -12,8 +12,8 @@ still very easy to parse & query.
 Usage:
 
 >>> foo = {'title':'Foo the first','dict':'Bar Bar Bar'}
->>> bucket = DictLiteStore('data.db','table_of_random_stuff')
->>> bucket.store(foo)
+>>> with DictLiteStore('data.db','table_of_random_stuff') as bucket:
+>>>     bucket.store(foo)
 1
 
 Now the dictionary 'foo' is stored as a row in data.db
@@ -49,7 +49,7 @@ def clean(unclean):
     return unicode(unclean.replace('"','""'))
 
 def cleanq(unclean):
-    ''' Cleans a string, and sticks quotes around it, for use in 
+    ''' Cleans a string, and sticks quotes around it, for use in
         SQLlite queries. '''
     return u'"' + unicode(unclean.replace('"','""')) + u'"'
 
@@ -60,7 +60,12 @@ class DictLiteStore(object):
         self.db_name = db_name
         self.table_name = clean(table_name)
 
-    def __enter__(self):
+    def open(self):
+        '''
+        open the connection to the database.
+        if you call this function, remember to close() as well.
+        '''
+
         self.db = lite.connect(self.db_name)
         self.db.row_factory = lite.Row
         self.cur = self.db.cursor()
@@ -77,20 +82,36 @@ class DictLiteStore(object):
         for row in self.cur.fetchall()[1:]:
             self.sql_columns.append(row[1])
 
-        return self
+    def close(self):
+        '''
+        commit and close the database connection. if you use
+        the 'with DictLiteStore(...) as ...' pattern, you don't need
+        to call this.
+        '''
 
-    def __exit__(self, exptype, expvalue, exptb):
         self.db.commit()
         self.db.close()
 
-    def store(self, doc):
+    def __enter__(self):
+        ''' Open the database connection.
+            Called in the 'with' pattern. '''
+        self.open()
+        return self
+
+    def __exit__(self, exptype, expvalue, exptb):
+        ''' Close the database connection.
+            Called in the 'with' pattern. '''
+        self.close()
+
+
+    def store(self, document):
         '''
         Store a dictionary (doc) in the database.
         Update the table columns as needed.
         '''
         columns = []
         data_spaces = []
-        for _k,v in doc.items():
+        for _k,v in document.items():
             # Clean the key:
             k = clean(_k)
             # If needed, add a new column to the self.db:
@@ -109,7 +130,7 @@ class DictLiteStore(object):
         # *NOTE* this is lossy.  Un-jsonable data will simply
         #        be dropped into it's string version!
         safe_values = []
-        for x in doc.values():
+        for x in document.values():
             safe_values.append(json.dumps(x, default=lambda x:unicode(x), ensure_ascii=False ))
 
 
@@ -123,15 +144,16 @@ class DictLiteStore(object):
 
 
     def select(self, *args, **vargs):
-        ''' A wrapper around sqllite select (makes things a little safer,
-            and simpler)
+        '''
+        A wrapper around sqllite select (makes things a little safer,
+        and simpler)
 
-            Usage:
+        Usage:
 
-            >>> select(('title','LIKE','%foo%'), order='mtime')
-            [ {'title': 'posts', 'other': 'are', 'data': 'returned'},
-              {'title': 'here', 'other': 'as', 'rows': 'a'},
-              {'title': 'list', 'more': 'of', 'stuff': 'dicts'} ]
+        >>> select(('title','LIKE','%foo%'), order='mtime')
+        [ {'title': 'posts', 'other': 'are', 'data': 'returned'},
+        {'title': 'here', 'other': 'as', 'rows': 'a'},
+        {'title': 'list', 'more': 'of', 'stuff': 'dicts'} ]
 
         '''
         # Work around python not liking *args before named args.
@@ -163,12 +185,12 @@ class DictLiteStore(object):
 
         # Run the query, and parse the result(s).
         data = [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]
-        for doc in data:
-            for k,v in doc.items():
+        for document in data:
+            for k,v in document.items():
                 if v == None:
-                    del doc[k]
+                    del document[k]
                 else:
-                    doc[k] = json.loads(v)
+                    document[k] = json.loads(v)
 
         # Return the newly parsed data:
         return data
