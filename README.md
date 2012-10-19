@@ -32,7 +32,9 @@ This is quite cool, as you can then use regular SQL to query stuff.
 SELECT * FROM 'dict_store' WHERE 'author' == '"dan"'
 ```
 
-for instance. (Note the quotes around the query value.)
+for instance. (Note the quotes around the query value.)  There is a
+simple wrapper around the sql select function that you can use if you
+don't want to run type sql yourself.
 
 Since the data is in json form, even for lists (like categories) you
 can fairly easily query it too.  Search for all rows with 'python' in
@@ -40,7 +42,6 @@ categories, say.  Sqllite full-text searches are reasonably fast.
 You don't get the performance benefits of one-to-many relationship
 queries, but if you're in a performance critical environment, you
 should probably be looking at a 'real' SQL server anyway.
-
 
 When the data is returned from sqllite, if you use the
 'select' function in the DictLiteStore module, it will re-convert
@@ -77,6 +78,9 @@ but as a stand-alone module, could also be pretty useful.
 ## Notes:
 
 - All data is serialised into json before writing, and deserialised on the way out.
+  This means strings do get extra quotes around them.  There could be a way to do this better,
+  but I'm not quite sure of the most efficient. (Try and deserialise, if it doesn't work,
+  leave as string?  Too many false positives, I'd have thought...)
 - All non-jsonable data is stringified first, and then json'd.
 - Currenly very little error-checking happens.  Before production, this needs
   a lot of shoring-up around the edges.
