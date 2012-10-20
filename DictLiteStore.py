@@ -103,14 +103,13 @@ class DictLiteStore(object):
             Called in the 'with' pattern. '''
         self.close()
 
+    def _update_columns(self, document):
+        ''' Update the table 'schema' to have any columns which the document
+            has, but the table doesn't.
+            Returns a list of the columns, quoted and ready to use
+            in a query. '''
 
-    def store(self, document):
-        '''
-        Store a dictionary (doc) in the database.
-        Update the table columns as needed.
-        '''
         columns = []
-        data_spaces = []
         for _k,v in document.items():
             # Clean the key:
             k = clean(_k)
@@ -122,26 +121,102 @@ class DictLiteStore(object):
                 self.sql_columns.append(k)
             # Add this item to the list of stuff to commit:
             columns.append(u'"' + k + u'"')
-            data_spaces.append(u'?')
+        
         # Commit new columns:
         self.db.commit()
 
-        # Prepare the data for writing.
-        # *NOTE* this is lossy.  Un-jsonable data will simply
-        #        be dropped into it's string version!
-        safe_values = []
-        for x in document.values():
-            safe_values.append(json.dumps(x, default=lambda x:unicode(x), ensure_ascii=False ))
+        return columns
 
+    def _prepare_values(self, document):
+        '''
+        get the values from document, and turn them into safe json strings.
+        *NOTE* this is lossy.  Un-jsonable data will simply
+               be dropped into it's string version!
+        '''
+        return [json.dumps(x, default=unicode, ensure_ascii=False) \
+             for x in document.values()]
 
-        # Now finally add the data into the database:
-        sql = u"INSERT INTO \"{0}\"({1}) VALUES({2})".format( \
+    def store(self, document):
+        '''
+        Store a dictionary (doc) in the database.
+        Update the table columns as needed.
+        '''
+
+        # Prepare the table, and get column names:
+        columns = self._update_columns(document)
+
+        # Prepare the data for writing:
+        values = self._prepare_values(document)
+
+        # Prepare the query:
+        sql = self._make_insert(columns)
+        
+        # Debug logging...
+        print (sql, values)
+
+        # Run it!
+        self.cur.execute(sql, values)
+
+    def update(self, document, insert=True, *args):
+        ''' Update a row in the database.  If $insert is true,
+        then insert the data as a new row, if nothing is updated.
+        '''
+         # Prepare the table, and get column names:
+        columns = self._update_columns(document)
+
+        # Prepare the data for writing:
+        values = self._prepare_values(document)
+
+        # Prepare the query:
+        sql, where_values = self._make_update(columns, args)
+
+        # Debug logging
+        print (sql, values, where_values)
+
+        self.cur.execute(sql, values + where_values)
+
+        if self.cur.rowcount == 0 and insert:
+            # No rows were modifed by query, and the user wants
+            # us to insert a row if that's the case.
+            sql = self._make_insert(columns)
+            self.cur.execute(sql, values)
+
+        return self.cur.rowcount
+
+    def _make_insert(self, columns):
+        return u"INSERT INTO \"{0}\"({1}) VALUES({2})".format( \
                     self.table_name, \
                     u','.join(columns), \
-                    u','.join(data_spaces))
-        self.cur.execute(sql, safe_values)
+                    u','.join(len(columns)*u'?'))
+    
+    def _make_update(self, columns, where):
 
+        update_clause = u','.join([c + u'=(?)' \
+            for c in columns])
 
+        where_clause, where_values = self._make_where_clause(*where)
+        return u"UPDATE \"{0}\" SET {1} {2}".format(
+            self.table_name,
+            update_clause,
+            where_clause
+            ), where_values
+
+    def _make_where_clause(self, *args):
+        if len(args) == 0:
+            return u'', []
+
+        # collection boxes:
+        where_clauses = []
+        sql_values = []
+
+        # work through inputs, sanitize 'em and put them in the collection:
+        for (col, operator, value) in args:
+            if not operator in _where_operators:
+                raise KeyError, 'Invalid operator ({0})'.format(operator)
+            where_clauses.append(u' '.join([cleanq(col), unicode(operator), u'(?)']))
+            sql_values.append(json.dumps(value))
+
+        return u'WHERE' + u' AND '.join(where_clauses), sql_values
 
     def select(self, *args, **vargs):
         '''
@@ -164,22 +239,12 @@ class DictLiteStore(object):
         # Sanitize column names and operators:
         ####
 
-        # collection boxes:
-        where_clauses = []
-        sql_values = []
-
-        # work through inputs, sanitize 'em and put them in the collection:
-        for (col, operator, value) in args:
-            if not operator in _where_operators:
-                raise KeyError, 'Invalid operator ({0})'.format(operator)
-            where_clauses.append(u' '.join([cleanq(col), unicode(operator), u'(?)']))
-            sql_values.append(value)
+        where_clause, sql_values = self._make_where_clause(*args)
 
         # Prepare the query:
-        sql = u'SELECT * FROM \"{0}\" {1} {2} ORDER BY ?'.format( \
-            self.table_name, \
-            u'WHERE' if len(args) != 0 else u'', \
-            u' AND '.join(where_clauses))
+        sql = u'SELECT * FROM \"{0}\" {1} ORDER BY ?'.format( \
+            self.table_name, where_clause)
+
         # Order by value gets tacked on the end:
         sql_values.append(cleanq(_options[u'order']))
 

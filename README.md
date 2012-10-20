@@ -34,7 +34,7 @@ SELECT * FROM 'dict_store' WHERE 'author' == '"dan"'
 
 for instance. (Note the quotes around the query value.)  There is a
 simple wrapper around the sql select function that you can use if you
-don't want to run type sql yourself.
+don't want to run type sql yourself. See the Usage section below.
 
 Since the data is in json form, even for lists (like categories) you
 can fairly easily query it too.  Search for all rows with 'python' in
@@ -47,6 +47,9 @@ When the data is returned from sqllite, if you use the
 'select' function in the DictLiteStore module, it will re-convert
 jsonified values (say that 'categories' list) back into a python
 list.  This is quite useful. :-)
+
+DictLiteStore is initially just an experiment for a later part of marlinespike
+cacheing system, but as a stand-alone module, could also be pretty useful.
 
 
 ##Usage:
@@ -72,8 +75,34 @@ returns
 [{'title':'Foo the first','dict':'Bar Bar Bar'}]
 ```
 
-This is initially just an experiment for a later part of marlinespike cacheing system,
-but as a stand-alone module, could also be pretty useful.
+To update the table, you also use the update() method:
+
+```python
+bucket.update({'title':'updated title'})
+```
+
+would update *all* rows to have the new title.  We can use the 'where' clause
+like in select to limit the damage:
+
+```python
+bucket.update({'title':'updated title'},
+    True,
+    ('title','==','old title'))
+```
+
+What's that random 'True' there for, you want to know?
+
+The update method needs to know if you want it to write the dict (insert it)
+into the table if the where clause fails.  If you want to ONLY update, and not
+insert if there is no matching row, then run update like this:
+
+```python
+bucket.update({'title':'updated title'},
+    False,
+    ('title','==','old title'))
+```
+
+
 
 ## Notes:
 

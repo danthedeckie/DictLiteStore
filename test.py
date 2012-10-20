@@ -14,12 +14,16 @@ d = {'not':'a','normal':'table'}
 
 e = {'title':'this is invalid data for json','splat':lambda x: x+x}
 
+silly = {'title':'silly','data':'also silly'}
 x = []
 with DictLiteStore('x.db') as s, open('f.txt','w') as f:
 
     s.store(c)
     s.store(d)
     s.store(e)
+    s.store(silly)
+
+    s.update({'title':'SILLY'}, False, ('title','==','silly'), ('elphant','==','here'))
 
     print 'retreving data:'
     x = s.select()
