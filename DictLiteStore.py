@@ -49,7 +49,10 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 import sqlite3 as lite
-import json
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 # These are the allowed operators for get()
 _where_operators = [
