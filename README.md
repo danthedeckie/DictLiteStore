@@ -33,7 +33,7 @@ SELECT * FROM 'dict_store' WHERE 'author' == '"dan"'
 ```
 
 for instance. (Note the quotes around the query value.)  There is a
-simple wrapper around the sql select function that you can use if you
+simple wrapper around the sql select function (get) that you can use if you
 don't want to run type sql yourself. See the Usage section below.
 
 Since the data is in json form, even for lists (like categories) you
@@ -44,7 +44,7 @@ queries, but if you're in a performance critical environment, you
 should probably be looking at a 'real' SQL server anyway.
 
 When the data is returned from sqllite, if you use the
-'select' function in the DictLiteStore module, it will re-convert
+'get' function in the DictLiteStore module, it will re-convert
 jsonified values (say that 'categories' list) back into a python
 list.  This is quite useful. :-)
 
@@ -64,11 +64,11 @@ with DictLiteStore('data.db','table_of_random_stuff') as bucket:
 
 Now the dictionary 'foo' is stored as a row in data.db
 You can either use SQLlite queries directly to access the data,
-or there is a very simple select wrapper which can be helpful for simple
+or there is a very simple SELECT wrapper which can be helpful for simple
 stuff:
 
 ```python
-bucket.select(('title','LIKE','%Foo%'))
+bucket.get(('title','LIKE','%Foo%'))
 ```
 returns
 ```python
@@ -82,7 +82,7 @@ bucket.update({'title':'updated title'})
 ```
 
 would update *all* rows to have the new title.  We can use the 'where' clause
-like in select to limit the damage:
+like in get to limit the damage:
 
 ```python
 bucket.update({'title':'updated title'},

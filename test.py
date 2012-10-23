@@ -26,9 +26,9 @@ with DictLiteStore('x.db') as s, open('f.txt','w') as f:
     s.update({'title':'SILLY'}, False, ('title','==','silly'), ('elphant','==','here'))
 
     print 'retreving data:'
-    x = s.select()
-    #print s.select()[1].encode('utf-8')
-#    print s.select()[1]['Ονομα']
+    x = s.get()
+    #print s.get()[1].encode('utf-8')
+#    print s.get()[1]['Ονομα']
     print 'dumping SQL:'
 
     print u'\n'.join([unicode(x) for x in s.db.iterdump()])

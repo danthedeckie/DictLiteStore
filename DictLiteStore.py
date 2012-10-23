@@ -5,6 +5,23 @@
 DictLiteStore.py
 (C) 2012 Daniel Fairhead
 
+This library is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+---
+
+DictLiteStore
+
 A Very simple module for storing schemaless / quasi-random dictionaries into a
 sqllite store. All values are stored as json in the database, which means it's
 still very easy to parse & query.
@@ -21,7 +38,7 @@ You can either use SQLlite queries directly to access the data,
 or there is a very simple select wrapper which can be helpful for simple
 stuff:
 
->>> bucket.select(('title','LIKE','%Foo%'))
+>>> bucket.get(('title','LIKE','%Foo%'))
 [{'title':'Foo the first','dict':'Bar Bar Bar'}]
 
 
@@ -34,7 +51,7 @@ sys.setdefaultencoding('utf-8')
 import sqlite3 as lite
 import json
 
-# These are the allowed operators for select()
+# These are the allowed operators for get()
 _where_operators = [
     '||',
     '*','/','%',
@@ -56,7 +73,7 @@ def cleanq(unclean):
 
 class DictLiteStore(object):
 
-    def __init__(self, db_name=":memory", table_name=u"def"):
+    def __init__(self, db_name=":memory:", table_name=u"def"):
         self.db_name = db_name
         self.table_name = clean(table_name)
 
@@ -218,14 +235,14 @@ class DictLiteStore(object):
 
         return u'WHERE' + u' AND '.join(where_clauses), sql_values
 
-    def select(self, *args, **vargs):
+    def get(self, *args, **vargs):
         '''
-        A wrapper around sqllite select (makes things a little safer,
+        A wrapper around sqllite SELECT (makes things a little safer,
         and simpler)
 
         Usage:
 
-        >>> select(('title','LIKE','%foo%'), order='mtime')
+        >>> bucket.get(('title','LIKE','%foo%'), order='mtime')
         [ {'title': 'posts', 'other': 'are', 'data': 'returned'},
         {'title': 'here', 'other': 'as', 'rows': 'a'},
         {'title': 'list', 'more': 'of', 'stuff': 'dicts'} ]
@@ -256,6 +273,5 @@ class DictLiteStore(object):
                     del document[k]
                 else:
                     document[k] = json.loads(v)
-
         # Return the newly parsed data:
         return data
