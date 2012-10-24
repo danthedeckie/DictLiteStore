@@ -27,8 +27,7 @@ with DictLiteStore('x.db') as s, open('f.txt','w') as f:
 
     print 'retreving data:'
     x = s.get()
-    #print s.get()[1].encode('utf-8')
-#    print s.get()[1]['Ονομα']
+
     print 'dumping SQL:'
 
     print u'\n'.join([unicode(x) for x in s.db.iterdump()])

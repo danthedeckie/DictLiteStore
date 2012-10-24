@@ -7,7 +7,8 @@
 # and then run 'nosetests' in this directory.
 # or 'nosetests -d' to get more debugging info.
 
-
+import os
+import os.path
 from DictLiteStore import DictLiteStore
 
 ###########################################
@@ -103,9 +104,10 @@ GOODWHERE = ('col1','==','data1')
 # a generic WHERE clause, which doesn't match
 BADWHERE = ('col1','==','bogus')
 
-# a couple of boilerplate reduction functions:
+# a boilerplate reduction function:
 
 def copy_change(original, updates):
+    ''' makes a copy of dict $original, and updates it with $updates '''
     # I suspect there is a standard library function for this.
     new = original.copy()
     new.update(updates)
@@ -223,27 +225,51 @@ def test_update_empty_table_fallbackto_insert():
 
 # 'Bad Names' (for columns) tests:
 
-def test_various_badnames():
-    a = {'"col1':'data1', 'col2':'data2'}
-    store_and_compare(a)
+SILLY_COLUMN_NAMES = ('"','""','"col1',"'","''",'\\','(',';','INSERT','==','\";')
 
-    a = {'"':'data1', 'col2':'data2'}
-    store_and_compare(a)
+def test_various_badnames_store_get_only():
+    for x in SILLY_COLUMN_NAMES:
 
-    a = {'""':'data1', 'col2':'data2'}
-    store_and_compare(a)
+        a = {x:'data1', 'col2':'data2'}
+        store_and_compare(a)
 
-    a = {'\"':'data1', 'col2':'data2'}
-    store_and_compare(a)
 
-    a = {'(':')'}
-    store_and_compare(a)
+def test_various_badname_update():
+    for x in SILLY_COLUMN_NAMES:
 
-    a = {'\'':'data1'}
-    store_and_compare(a)
+        a = {x:'data1'}
+        with DictLiteStore() as s:
+            s.store(a)
+            s.update({x:'UPDATED'})
 
-    a = {';':'data1'}
-    store_and_compare(a)
+            c = s.get()
+            assert c == [{x:'UPDATED'}]
+
+# TODO: deletion and other selection 'badname' checks.
+
+# Other tests:
+
+def test_db_file():
+    # First test it doesn't already exist:
+    assert os.path.exists('__test.db') == False
+
+    # Store some data:
+    with DictLiteStore('__test.db') as s:
+        s.store(ROW1)
+        s.store(ROW2)
+
+    # Should be saved.
+    assert os.path.exists('__test.db')
+
+    # Retreive it again, check it's alright:
+    with DictLiteStore('__test.db') as s:
+        c = s.get()
+        assert c == [ROW1, ROW2]
+
+    # remove it.
+    os.remove('__test.db')
+
+    assert os.path.exists('__test.db') == False
 
 # TODO:
 # - test writing to a file.
