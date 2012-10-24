@@ -111,23 +111,16 @@ def copy_change(original, updates):
     new.update(updates)
     return new
 
-def send_update_compare(data, updates, post_data):
-    ''' store some data, run some updates, compare the result. '''
-    with DictLiteStore() as s:
-        for d in data:
-            s.store(d)
-        for u in updates:
-            s.update(u)
-
-        assert s.get() == list(post_data)
-
 # And the update tests:
 
 def test_multiple_rows_same_columns():
-    send_update_compare(
-        (ROW1, ROW1),
-        (),
-        (ROW1, ROW1))
+    with DictLiteStore() as s:
+        s.store(ROW1)
+        s.store(ROW1)
+
+        c = s.get()
+
+        assert c == [ROW1, ROW1]
 
 def test_rows_with_different_columns():
 
@@ -136,6 +129,7 @@ def test_rows_with_different_columns():
         s.store(ROW2)
 
         c = s.get()
+
         assert c[0] == ROW1
         assert c[1] == ROW2
 
@@ -146,7 +140,9 @@ def test_update_all_rows_with_one_entry():
 
     with DictLiteStore() as s:
         s.store(ROW1)
+
         s.update(UPDATE1)
+
         from_db = s.get()
 
         assert from_db[0] == post_update
@@ -160,7 +156,9 @@ def test_update_all_rows_with_multiple_entries():
     with DictLiteStore() as s:
         s.store(ROW1)
         s.store(ROW2)
+
         s.update(UPDATE1)
+
         from_db = s.get()
 
         assert from_db[0] == post_update_a
@@ -174,7 +172,9 @@ def test_update_single_row():
     with DictLiteStore() as s:
         s.store(ROW1)
         s.store(ROW2)
+
         s.update(UPDATE1, False, GOODWHERE)
+
         from_db = s.get()
 
         assert from_db[0] == post_update_a
@@ -184,7 +184,9 @@ def test_update_fallbackto_insert():
 
     with DictLiteStore() as s:
         s.store(ROW1)
+
         s.update(UPDATE1, True, BADWHERE)
+
         from_db = s.get()
 
         assert from_db[0] == ROW1
@@ -195,7 +197,9 @@ def test_update_fallbackto_nothing():
 
     with DictLiteStore() as s:
         s.store(ROW1)
+
         s.update(UPDATE1, False, BADWHERE)
+
         from_db = s.get()
 
         assert len(from_db) == 1
@@ -204,6 +208,7 @@ def test_update_fallbackto_nothing():
 def test_update_empty_table():
     with DictLiteStore() as s:
         s.update(UPDATE1, False, BADWHERE)
+
         from_db = s.get()
 
         assert from_db == []
@@ -211,12 +216,34 @@ def test_update_empty_table():
 def test_update_empty_table_fallbackto_insert():
     with DictLiteStore() as s:
         s.update(UPDATE1, True, BADWHERE)
+
         from_db = s.get()
+
         assert from_db == [UPDATE1]
 
+# 'Bad Names' (for columns) tests:
 
+def test_various_badnames():
+    a = {'"col1':'data1', 'col2':'data2'}
+    store_and_compare(a)
 
+    a = {'"':'data1', 'col2':'data2'}
+    store_and_compare(a)
 
+    a = {'""':'data1', 'col2':'data2'}
+    store_and_compare(a)
+
+    a = {'\"':'data1', 'col2':'data2'}
+    store_and_compare(a)
+
+    a = {'(':')'}
+    store_and_compare(a)
+
+    a = {'\'':'data1'}
+    store_and_compare(a)
+
+    a = {';':'data1'}
+    store_and_compare(a)
 
 # TODO:
 # - test writing to a file.

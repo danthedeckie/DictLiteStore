@@ -54,6 +54,11 @@ try:
 except ImportError:
     import json
 
+import logging
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
+
 # These are the allowed operators for get()
 _where_operators = [
     '||',
@@ -172,7 +177,7 @@ class DictLiteStore(object):
         sql = self._make_insert(columns)
         
         # Debug logging...
-        print (sql, values)
+        log.debug ('SQL: %s DATA: %s', sql, values)
 
         # Run it!
         self.cur.execute(sql, values)
@@ -181,7 +186,10 @@ class DictLiteStore(object):
         ''' Update a row in the database.  If $insert is true,
         then insert the data as a new row, if nothing is updated.
         '''
-         # Prepare the table, and get column names:
+
+        assert hasattr(document, 'items')
+
+        # Prepare the table, and get column names:
         columns = self._update_columns(document)
 
         # Prepare the data for writing:
@@ -191,7 +199,7 @@ class DictLiteStore(object):
         sql, where_values = self._make_update(columns, args)
 
         # Debug logging
-        print (sql, values, where_values)
+        log.debug ('SQL: %s, DATA: %s, WHERE: %s', sql, values, where_values)
 
         self.cur.execute(sql, values + where_values)
 
