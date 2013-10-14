@@ -28,8 +28,8 @@ still very easy to parse & query.
 
 Usage:
 
->>> foo = {'title':'Foo the first','dict':'Bar Bar Bar'}
->>> with DictLiteStore('data.db','table_of_random_stuff') as bucket:
+>>> foo = {'title': 'Foo the first', 'dict': 'Bar Bar Bar'}
+>>> with DictLiteStore('data.db', 'table_of_random_stuff') as bucket:
 >>>     bucket.store(foo)
 1
 
@@ -38,8 +38,15 @@ You can either use SQLlite queries directly to access the data,
 or there is a very simple select wrapper which can be helpful for simple
 stuff:
 
->>> bucket.get(('title','LIKE','%Foo%'))
+>>> bucket.get(('title', '==', 'Foo the first'))
 [{'title':'Foo the first','dict':'Bar Bar Bar'}]
+
+or more realistically:
+
+>>> bucket.get(('title', 'LIKE', NoJSON('%Foo%')))
+[{'title':'Foo the first','dict':'Bar Bar Bar'}]
+
+(Note the NoJSON wrapper, which allows the Querystring to go through unharmed.)
 
 
 """
@@ -56,11 +63,11 @@ except ImportError:
 
 import logging
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__name__) #pylint: disable=invalid-name
 log.addHandler(logging.NullHandler())
 
 # These are the allowed operators for get()
-_where_operators = [
+_WHERE_OPERATORS = [  #pylint: disable=invalid-name
     '||',
     '*','/','%',
     '+','-',
@@ -85,14 +92,43 @@ class NoJSON(unicode):
     pass
 
 def json_or_raw(text):
+    '''
+    wrapper make NoJSON objects work easily.
+    When the client (to the library) wants to pass something to SQL directly,
+    and not have DictLiteStore wrap it in JSON, they use a NoJSON wrapper for
+    the text.
+    '''
     if isinstance(text, NoJSON):
         return text
     else:
         return json.dumps(text)
 
+
+def _prepare_values(document):
+    '''
+    get the values from document, and turn them into safe json strings.
+    *NOTE* this is lossy.  Un-jsonable data will simply
+           be dropped into it's string version!
+    '''
+    return [json.dumps(x, default=unicode, ensure_ascii=False) \
+         for x in document.values()]
+
+
+################################################################################
+
+
 class DictLiteStore(object):
+    '''
+    A simple(ish) way to store dict-like objects in a SQLite database,
+    which can then be queried against.  Useful for caching schemaless data.
+    '''
 
     def __init__(self, db_name=":memory:", table_name=u"def"):
+        '''
+        Initialise the object, but don't actually open the database
+        connection yet.
+        '''
+
         self.db_name = db_name
         self.table_name = clean(table_name)
 
@@ -106,7 +142,8 @@ class DictLiteStore(object):
         self.db.row_factory = lite.Row
         self.cur = self.db.cursor()
 
-        self.cur.execute(u"CREATE TABLE IF NOT EXISTS \"{0}\"(Id INT)".format(self.table_name))
+        self.cur.execute(u'CREATE TABLE IF NOT EXISTS'
+                          ' "{0}"(Id INT)'.format(self.table_name))
         self.db.commit()
 
         self.sql_columns = []
@@ -146,31 +183,23 @@ class DictLiteStore(object):
             in a query. '''
 
         columns = []
-        for _k,v in document.items():
+        for raw_key in document.keys():
             # Clean the key:
-            k = clean(_k)
+            key = clean(raw_key)
+
             # If needed, add a new column to the self.db:
-            if not k in self.sql_columns:
+            if key not in self.sql_columns:
                 sql = u"ALTER TABLE \"{0}\" " \
-                      u"ADD COLUMN \"{1}\"".format(self.table_name, k)
+                      u"ADD COLUMN \"{1}\"".format(self.table_name, key)
                 self.cur.execute(sql)
-                self.sql_columns.append(k)
+                self.sql_columns.append(key)
             # Add this item to the list of stuff to commit:
-            columns.append(u'"' + k + u'"')
-        
+            columns.append(u'"' + key + u'"')
+
         # Commit new columns:
         self.db.commit()
 
         return columns
-
-    def _prepare_values(self, document):
-        '''
-        get the values from document, and turn them into safe json strings.
-        *NOTE* this is lossy.  Un-jsonable data will simply
-               be dropped into it's string version!
-        '''
-        return [json.dumps(x, default=unicode, ensure_ascii=False) \
-             for x in document.values()]
 
     def store(self, document):
         '''
@@ -182,11 +211,11 @@ class DictLiteStore(object):
         columns = self._update_columns(document)
 
         # Prepare the data for writing:
-        values = self._prepare_values(document)
+        values = _prepare_values(document)
 
         # Prepare the query:
         sql = self._make_insert(columns)
-        
+
         # Debug logging...
         log.debug ('SQL: %s DATA: %s', sql, values)
 
@@ -194,7 +223,8 @@ class DictLiteStore(object):
         self.cur.execute(sql, values)
 
     def update(self, document, insert=True, *args):
-        ''' Update a row in the database.  If $insert is true,
+        '''
+        Update a row in the database.  If $insert is true,
         then insert the data as a new row, if nothing is updated.
         '''
 
@@ -204,7 +234,7 @@ class DictLiteStore(object):
         columns = self._update_columns(document)
 
         # Prepare the data for writing:
-        values = self._prepare_values(document)
+        values = _prepare_values(document)
 
         # Prepare the query:
         sql, where_values = self._make_update(columns, args)
@@ -223,24 +253,40 @@ class DictLiteStore(object):
         return self.cur.rowcount
 
     def _make_insert(self, columns):
-        return u"INSERT INTO \"{0}\"({1}) VALUES({2})".format( \
+        '''
+        Given a simple list of column names,
+        return 'INSERT INTO "x"(column_names, etc) VALUES(?, ?)'
+        '''
+
+        return u'INSERT INTO "{0}"({1}) VALUES({2})'.format( \
                     self.table_name, \
                     u','.join(columns), \
                     u','.join(len(columns)*u'?'))
-    
+
     def _make_update(self, columns, where):
+        '''
+        Given a list of columns, and a DictLiteStore style where clause,
+        return ('UPDATE "x" SET a=(?),b=(?),c=(?) WHERE...', where_vals)
+        '''
 
-        update_clause = u','.join([c + u'=(?)' \
-            for c in columns])
+        # x=(?),y=(?),z=(?)
+        update_clause = u','.join([c + u'=(?)' for c in columns])
 
+        # WHERE ...
         where_clause, where_values = self._make_where_clause(*where)
-        return u"UPDATE \"{0}\" SET {1} {2}".format(
+
+        return u'UPDATE "{0}" SET {1} {2}'.format(
             self.table_name,
             update_clause,
             where_clause
             ), where_values
 
     def _make_where_clause(self, *args):
+        '''
+        given a list of three-tuples (column_name, operator, value)
+        return the valid SQL version of it for use at the end of queries.
+        '''
+
         if len(args) == 0:
             return u'', []
 
@@ -250,9 +296,11 @@ class DictLiteStore(object):
 
         # work through inputs, sanitize 'em and put them in the collection:
         for (col, operator, value) in args:
-            if not operator in _where_operators:
+            if not operator in _WHERE_OPERATORS:
                 raise KeyError, 'Invalid operator ({0})'.format(operator)
-            where_clauses.append(u' '.join([cleanq(col), unicode(operator), u'(?)']))
+            where_clauses.append(u' '.join([cleanq(col),
+                                            unicode(operator),
+                                            u'(?)']))
             if isinstance(value, NoJSON):
                 sql_values.append(value)
             else:
@@ -261,6 +309,11 @@ class DictLiteStore(object):
         return u'WHERE' + u' AND '.join(where_clauses), sql_values
 
     def _make_order_clause(self, order_input=None):
+        '''
+        given a list of columns to order by,
+        return the correct SQL to add into a query.
+        '''
+
         if not order_input:
             return u''
         if not hasattr(order_input, '__iter__'):
@@ -321,7 +374,7 @@ class DictLiteStore(object):
         data = [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]
         for document in data:
             log.debug('ROW: %s', document)
-            for k,v in document.items():
+            for k, v in document.items():
                 if v == None:
                     del document[k]
                 else:
