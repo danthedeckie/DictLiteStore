@@ -113,6 +113,33 @@ def _prepare_values(document):
     return [json.dumps(x, default=unicode, ensure_ascii=False) \
          for x in document.values()]
 
+def _make_where_clause(*args):
+    '''
+    given a list of three-tuples (column_name, operator, value)
+    return the valid SQL version of it for use at the end of queries.
+    '''
+
+    if len(args) == 0:
+        return u'', []
+
+    # collection boxes:
+    where_clauses = []
+    sql_values = []
+
+    # work through inputs, sanitize 'em and put them in the collection:
+    for (col, operator, value) in args:
+        if not operator in _WHERE_OPERATORS:
+            raise KeyError, 'Invalid operator ({0})'.format(operator)
+        where_clauses.append(u' '.join([cleanq(col),
+                                        unicode(operator),
+                                        u'(?)']))
+        if isinstance(value, NoJSON):
+            sql_values.append(value)
+        else:
+            sql_values.append(json.dumps(value))
+
+    return u'WHERE' + u' AND '.join(where_clauses), sql_values
+
 
 ################################################################################
 
@@ -273,40 +300,13 @@ class DictLiteStore(object):
         update_clause = u','.join([c + u'=(?)' for c in columns])
 
         # WHERE ...
-        where_clause, where_values = self._make_where_clause(*where)
+        where_clause, where_values = _make_where_clause(*where)
 
         return u'UPDATE "{0}" SET {1} {2}'.format(
             self.table_name,
             update_clause,
             where_clause
             ), where_values
-
-    def _make_where_clause(self, *args):
-        '''
-        given a list of three-tuples (column_name, operator, value)
-        return the valid SQL version of it for use at the end of queries.
-        '''
-
-        if len(args) == 0:
-            return u'', []
-
-        # collection boxes:
-        where_clauses = []
-        sql_values = []
-
-        # work through inputs, sanitize 'em and put them in the collection:
-        for (col, operator, value) in args:
-            if not operator in _WHERE_OPERATORS:
-                raise KeyError, 'Invalid operator ({0})'.format(operator)
-            where_clauses.append(u' '.join([cleanq(col),
-                                            unicode(operator),
-                                            u'(?)']))
-            if isinstance(value, NoJSON):
-                sql_values.append(value)
-            else:
-                sql_values.append(json.dumps(value))
-
-        return u'WHERE' + u' AND '.join(where_clauses), sql_values
 
     def _make_order_clause(self, order_input=None):
         '''
@@ -359,7 +359,7 @@ class DictLiteStore(object):
         # Sanitize column names and operators:
         ####
 
-        where_clause, sql_values = self._make_where_clause(*args)
+        where_clause, sql_values = _make_where_clause(*args)
 
         # Order by value gets tacked on the end:
         order_clause = self._make_order_clause(_options[u'order'])
