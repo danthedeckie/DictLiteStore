@@ -5,7 +5,7 @@ setup(
     version = '0.9.1',
     description = 'A (Dynamic-Schema) dict -> sqlite3 library',
     author = 'Daniel Fairhead',
-    author_email = 'daniel.fairhead@om.org',
+    author_email = 'danthedeckie@gmail.com',
     url = 'https://github.com/danthedeckie/DictLiteStore',
     download_url = 'https://github.com/danthedeckie/DictLiteStore/tarball/0.9.1',
     keywords = ['json', 'dict', 'persistance', 'sqlite', 'dynamic schema'],
