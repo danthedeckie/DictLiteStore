@@ -11,7 +11,7 @@ sys.setdefaultencoding('utf-8') # pylint: disable=no-member
 
 import os
 import os.path
-from DictLiteStore import DictLiteStore
+from dictlitestore import DictLiteStore
 import unittest
 
 # pylint: disable=missing-docstring, invalid-name, too-many-public-methods
