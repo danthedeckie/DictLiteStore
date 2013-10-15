@@ -1,10 +1,11 @@
-# DictLiteStore alpha
-# WORK IN PROGRESS
+# DictLiteStore Version 0.9.1
+---------
+A dynamic-schema sqlite backend for storing python dicts in a queriable
+database.
 
-A Very simple module for storing schemaless / quasi-random dictionaries into a
-sqllite store. All values within the dict are stored as json values in the database,
-but the keys are mapped into table columns, So you can query things , while
-it's still very easy to parse.
+All values within the dict are stored as json values
+in the database, but the keys are mapped into table columns, So you can
+query things , while it's still very easy to parse.
 
 When you try to add a dict which has keys which *aren't* in the table
 already, it will automatically add those columns.
@@ -20,10 +21,10 @@ So a dict:
 
 becomes in the database:
 
-```
-AUTHOR | PROJECT          | CATEGORIES
-"dan"    "DictLiteStore"    ['python', 'dict', 'persistance']
-```
+| AUTHOR  | PROJECT           | CATEGORIES                          |
+| ------- | ----------------- | ----------------------------------- |
+| `"dan"` | `"DictLiteStore"` | `['python', 'dict', 'persistance']` |
+
 
 This is quite cool, as you can then use regular SQL to query stuff.
 
@@ -48,9 +49,9 @@ When the data is returned from sqllite, if you use the
 jsonified values (say that 'categories' list) back into a python
 list.  This is quite useful. :-)
 
-DictLiteStore is initially just an experiment for a later part of marlinespike
-cacheing system, but as a stand-alone module, could also be pretty useful.
-
+DictLiteStore was initially just an experiment for a later part of
+marlinespike's cacheing system, but as a stand-alone module,
+is useful for many data storage systems.
 
 ##Usage:
 
@@ -68,7 +69,7 @@ or there is a very simple SELECT wrapper which can be helpful for simple
 stuff:
 
 ```python
-bucket.get(('title','LIKE','%Foo%'))
+bucket.get(('title','LIKE',NoJSON('%Foo%')))
 ```
 returns
 ```python

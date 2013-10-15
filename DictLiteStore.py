@@ -53,18 +53,28 @@ or more realistically:
 
 import sys
 reload(sys)
-sys.setdefaultencoding('utf-8')
+sys.setdefaultencoding('utf-8') # pylint: disable=no-member
 
 import sqlite3 as lite
 try:
-    import simplejson as json
+    import simplejson as json # pylint: disable=import-error
 except ImportError:
     import json
 
 import logging
 
 log = logging.getLogger(__name__) #pylint: disable=invalid-name
-log.addHandler(logging.NullHandler())
+
+try:
+    log.addHandler(logging.NullHandler())
+except AttributeError:
+    # Stupid old pythons!
+    import logging.handlers
+    log.addHandler(logging.handlers.MemoryHandler(0))
+
+
+__version__ = '0.9.1'
+
 
 # These are the allowed operators for get()
 _WHERE_OPERATORS = [  #pylint: disable=invalid-name
@@ -86,7 +96,7 @@ def cleanq(unclean):
     return u'"' + unicode(unclean.replace('"','""')) + u'"'
 
 
-class NoJSON(unicode):
+class NoJSON(unicode): # pylint: disable=too-many-public-methods
     ''' a string type, which should *not* be json dumped.  *Very* useful
         for queries '''
     pass
@@ -100,6 +110,8 @@ def json_or_raw(text):
     '''
     if isinstance(text, NoJSON):
         return text
+    elif text == None:
+        return None
     else:
         return json.dumps(text)
 
@@ -129,7 +141,7 @@ def _make_where_clause(*args):
     # work through inputs, sanitize 'em and put them in the collection:
     for (col, operator, value) in args:
         if not operator in _WHERE_OPERATORS:
-            raise KeyError, 'Invalid operator ({0})'.format(operator)
+            raise KeyError('Invalid operator ({0})'.format(operator))
         where_clauses.append(u' '.join([cleanq(col),
                                         unicode(operator),
                                         u'(?)']))
@@ -166,6 +178,7 @@ class DictLiteStore(object):
         '''
 
         self.db = lite.connect(self.db_name)
+        self.db.text_factory = lambda x: x.encode('utf-8')
         self.db.row_factory = lite.Row
         self.cur = self.db.cursor()
 
@@ -300,7 +313,7 @@ class DictLiteStore(object):
         update_clause = u','.join([c + u'=(?)' for c in columns])
 
         # WHERE ...
-        where_clause, where_values = _make_where_clause(*where)
+        where_clause, where_values = _make_where_clause(*where) #pylint: disable=star-args
 
         return u'UPDATE "{0}" SET {1} {2}'.format(
             self.table_name,
@@ -374,10 +387,22 @@ class DictLiteStore(object):
         data = [dict(x) for x in self.cur.execute(sql, sql_values).fetchall()]
         for document in data:
             log.debug('ROW: %s', document)
-            for k, v in document.items():
-                if v == None:
-                    del document[k]
+            for key, value in document.items():
+                if value == None:
+                    del document[key]
                 else:
-                    document[k] = json.loads(v)
+                    document[key] = json.loads(value)
         # Return the newly parsed data:
         return data
+
+    def delete(self, *args):
+        ''' a wrapper around sqlite DELETE '''
+
+        where_clause, sql_values = _make_where_clause(*args)
+        sql = u'DELETE FROM \"{0}\" {1}'.format(self.table_name, where_clause)
+
+        log.debug('SQL: %s; DATA: %s;', sql, sql_values)
+
+        return self.cur.execute(sql, sql_values)
+
+
