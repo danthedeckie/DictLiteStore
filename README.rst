@@ -64,16 +64,36 @@ Take a dict of data::
         bucket.store(foo)
 
 Now the dictionary 'foo' is stored as a row in data.db
+
+---------
+Retrieval
+---------
+
 You can either use SQLlite queries directly to access the data,
 or there is a very simple SELECT wrapper which can be helpful for simple
 stuff: ::
 
+    bucket.get(('title', '==', 'Foo the first'))
 
-    bucket.get(('title','LIKE',NoJSON('%Foo%')))
+Or using other SQL operators, such as LIKE: ::
 
-returns ::
+    bucket.get(('title', 'LIKE', NoJSON('%Foo%')))
+
+(The NoJSON wrapper stops DictLiteStore from trying to be clever and JSON escaping
+the `%Foo%` string into `"%Foo%"`, which in this instance might actually work, but
+can be puzzling and annoying.)
+
+Both of those queries return ::
 
     [{'title':'Foo the first','dict':'Bar Bar Bar'}]
+
+You can also query the database yourself directly if you want with normal SQL: ::
+
+    SELECT * from "table_of_random_stuff" WHERE "title" == '"Foo the first"';
+
+--------
+Updating
+--------
 
 To update the table, you also use the update() method: ::
 
@@ -96,6 +116,24 @@ insert if there is no matching row, then run update like this: ::
                   False,
                   ('title','==','old title'))
 
+----------
+JSON Lists
+----------
+
+One useful feature of going through JSON, is that all items in a list get stored
+comma (and quote) separated.  So, say you're storing a bunch of tags on a document: ::
+
+    bucket.store({'title': 'Why is Juggling fun?',
+                  'content': 'blah blah',
+                  'tags': ['juggling', 'hobbies', 'fun stuff', 'etc']})
+
+You can then search specific tags, using the `'LIKE'` operator, and NoJSON, as before: ::
+
+    return bucket.get(('tags', 'LIKE', NoJSON('%"' + tagname + '"%'))
+
+Obviously, this is nothing like as fast or scalable as doing "real SQL" using cross
+reference tables and so on.  However, for the small, light, dirt-quick-and-easy projects
+DictLiteStore is intended for, it should be fine.
 
 ======
 Notes:
