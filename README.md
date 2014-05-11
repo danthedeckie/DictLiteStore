@@ -1,46 +1,49 @@
-=============
-DictLiteStore
-=============
-
-.. image:: https://coveralls.io/repos/danthedeckie/DictLiteStore/badge.png?branch=master
-  :target: https://coveralls.io/r/danthedeckie/DictLiteStore?branch=master
+# DictLiteStore
 
 
-A dynamic-schema sqlite backend for storing python dicts in a queriable
-database.
+[![Build Status](https://travis-ci.org/danthedeckie/DictLiteStore.svg?branch=master)](https://travis-ci.org/danthedeckie/DictLiteStore)  [![Coverage Status](https://img.shields.io/coveralls/danthedeckie/DictLiteStore.svg)](https://coveralls.io/r/danthedeckie/DictLiteStore?branch=master)
 
-All values within the dict are stored as json values
+
+A GPL3 licenced dynamic-schema sqlite backend for storing python dicts in a
+queriable database.  Single-file, easy to use, so you can easily include it
+as part of your own projects.
+
+All values within the dict are stored as JSON values
 in the database, but the keys are mapped into table columns, So you can
 query things , while it's still very easy to parse.
 
 When you try to add a dict which has keys which *aren't* in the table
 already, it will automatically add those columns.
 
-So a dict: ::
+So a dict:
+
+```python
 
     {'author': 'dan',
      'project': 'DictLiteStore',
      'categories': ['python', 'dict', 'persistance']
     }
+```
 
 becomes in the database:
 
 
-+-----------+---------------------+---------------------------------------+
-| AUTHOR    |  PROJECT            |   CATEGORIES                          |
-+===========+=====================+=======================================+
-| ``"dan"`` | ``"DictLiteStore"`` | ``["python", "dict", "persistance"]`` |
-+-----------+---------------------+---------------------------------------+
+AUTHOR    |  PROJECT            |   CATEGORIES
+--------- | ------------------- | -------------------------------------
+  `"dan"` | `"DictLiteStore"`   | `["python", "dict", "persistance"]`
 
-This is quite cool, as you can then use regular SQL to query stuff. ::
 
+This is quite cool, as you can then use regular SQL to query stuff.
+
+```sql
     SELECT * FROM 'dict_store' WHERE 'author' == '"dan"'
+```
 
 for instance. (Note the quotes around the query value.)  There is a
-simple wrapper around the sql select function (get) that you can use if you
-don't want to run type sql yourself. See the Usage section below.
+simple wrapper around the SQL select function (get) that you can use if you
+don't want to run type SQL yourself. See the Usage section below.
 
-Since the data is in json form, even for lists (like categories) you
+Since the data is in JSON form, even for lists (like categories) you
 can fairly easily query it too.  Search for all rows with 'python' in
 categories, say.  Sqllite full-text searches are reasonably fast.
 You don't get the performance benefits of one-to-many relationship
@@ -49,105 +52,118 @@ should probably be looking at a 'real' SQL server anyway.
 
 When the data is returned from sqllite, if you use the
 'get' function in the DictLiteStore module, it will re-convert
-jsonified values (say that 'categories' list) back into a python
+JSONified values (say that 'categories' list) back into a python
 list.  This is quite useful. :-)
 
 DictLiteStore was initially just an experiment for a later part of
 marlinespike's cacheing system, but as a stand-alone module,
 is useful for many data storage systems.
 
-======
-Usage:
-======
+## Usage:
 
-Take a dict of data::
+Take a dict of data
 
+``` python
     foo = {'title': 'Foo the first', 'dict':'Bar Bar Bar'}
 
     with DictLiteStore('data.db', 'table_of_random_stuff') as bucket:
         bucket.store(foo)
+```
 
-Now the dictionary 'foo' is stored as a row in data.db
+Now the dictionary `foo` is stored as a row in `data.db`
 
----------
-Retrieval
----------
+## Retrieval
 
 You can either use SQLlite queries directly to access the data,
 or there is a very simple SELECT wrapper which can be helpful for simple
-stuff: ::
+stuff:
 
+```python
     bucket.get(('title', '==', 'Foo the first'))
+```
 
-Or using other SQL operators, such as LIKE: ::
+Or using other SQL operators, such as LIKE:
 
+```python
     bucket.get(('title', 'LIKE', NoJSON('%Foo%')))
+```
 
-(The NoJSON wrapper stops DictLiteStore from trying to be clever and JSON escaping
+(The `NoJSON` wrapper stops DictLiteStore from trying to be clever and JSON escaping
 the `%Foo%` string into `"%Foo%"`, which in this instance might actually work, but
 can be puzzling and annoying.)
 
-Both of those queries return ::
+Both of those queries return
 
+```python
     [{'title':'Foo the first','dict':'Bar Bar Bar'}]
+```
 
 You can also query the database yourself directly if you want with normal SQL: ::
 
+```sql
     SELECT * from "table_of_random_stuff" WHERE "title" == '"Foo the first"';
+```
 
---------
-Updating
---------
+## Updating
 
-To update the table, you also use the update() method: ::
 
+To update the table, you also use the update() method:
+
+```python
     bucket.update({'title':'updated title'})
+```
 
 would update *all* rows to have the new title.  We can use the 'where' clause
-like in get to limit the damage: ::
+like in get to limit the damage:
 
+```python
     bucket.update({'title': 'updated title'},
                   True,
                   ('title', '==', 'old title'))
+```
 
-What's that random 'True' there for, you want to know?
+### What's that random 'True' there for, you want to know?
 
 The update method needs to know if you want it to write the dict (insert it)
 into the table if the where clause fails.  If you want to ONLY update, and not
-insert if there is no matching row, then run update like this: ::
+insert if there is no matching row, then run update like this:
 
+```
     bucket.update({'title':'updated title'},
                   False,
                   ('title','==','old title'))
+```
 
-----------
-JSON Lists
-----------
+
+## JSON Lists
+
 
 One useful feature of going through JSON, is that all items in a list get stored
-comma (and quote) separated.  So, say you're storing a bunch of tags on a document: ::
+comma (and quote) separated.  So, say you're storing a bunch of tags on a document:
 
+```python
     bucket.store({'title': 'Why is Juggling fun?',
                   'content': 'blah blah',
                   'tags': ['juggling', 'hobbies', 'fun stuff', 'etc']})
+```
 
-You can then search specific tags, using the `'LIKE'` operator, and NoJSON, as before: ::
+You can then search specific tags, using the `'LIKE'` operator, and `NoJSON`, as before:
 
+```python
     return bucket.get(('tags', 'LIKE', NoJSON('%"' + tagname + '"%'))
+```
 
 Obviously, this is nothing like as fast or scalable as doing "real SQL" using cross
 reference tables and so on.  However, for the small, light, dirt-quick-and-easy projects
 DictLiteStore is intended for, it should be fine.
 
-======
-Notes:
-======
+# Notes:
 
-* All data is serialised into json before writing, and deserialised on the way out.
+* All data is serialised into JSON before writing, and deserialised on the way out.
   This means strings do get extra quotes around them.  There could be a way to do this better,
   but I'm not quite sure of the most efficient. (Try and deserialise, if it doesn't work,
   leave as string?  Too many false positives, I'd have thought...)
-* All non-jsonable data is stringified first, and then json'd.
+* All non-JSONable data is stringified first, and then JSON'd.
 * Currenly very little error-checking happens.  Before production, this needs
   a lot of shoring-up around the edges.
 * I need to do some performance experiments!  How well does this actually work, speed wise?
