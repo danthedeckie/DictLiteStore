@@ -11,10 +11,29 @@ sys.setdefaultencoding('utf-8') # pylint: disable=no-member
 
 import os
 import os.path
-from dictlitestore import DictLiteStore
+from dictlitestore import DictLiteStore, NoJSON, json_or_raw
 import unittest
 
 # pylint: disable=missing-docstring, invalid-name, too-many-public-methods
+
+############################################
+
+class TestJson_or_raw(unittest.TestCase):
+    def testNoJson(self):
+        self.assertEqual("Text", NoJSON("Text"))
+        self.assertEqual("Text", json_or_raw(NoJSON("Text")))
+    def testNormal(self):
+        self.assertEqual('"Text"', json_or_raw("Text"))
+        self.assertEqual('"T\' []ext"', json_or_raw("T' []ext"))
+        self.assertEqual('"T\\"ext"', json_or_raw("T\"ext"))
+    def testNone(self):
+        self.assertEqual(None, json_or_raw(None))
+    def testNonJSONable(self):
+        class Bug(object):
+            pass
+        bug = Bug()
+        with self.assertRaises(TypeError):
+            json_or_raw(bug)
 
 ###########################################
 #
@@ -50,6 +69,7 @@ class Basic(unittest.TestCase):
 # Very simple store and return tests for basic data types.
 #
 #########################################
+
 
 class TestBasicDataTypes(Basic):
     def test_text_only(self):
@@ -138,6 +158,66 @@ def copy_change(original, updates):
     new.update(updates)
     return new
 
+class TestSort(Basic):
+    def test_basic_good_sorts(self):
+        with DictLiteStore() as s:
+            a = {"a": 0, "b": "y"}
+            b = {"a": 2, "b": "x"}
+            c = {"a": 20917203912, "b": "z"}
+            s.store(a)
+            s.store(b)
+            s.store(c)
+
+            rows = s.get()
+
+            self.assertEqual(len(rows), 3)
+            self.assertEqual([a, b, c], rows)
+
+            rows = s.get(order="b")
+            self.assertEqual([b, a, c], rows)
+
+            rows = s.get(order=None)
+            self.assertEqual([a, b, c], rows)
+
+            rows = s.get(order=[("b", "DESC")])
+            self.assertEqual([c, a, b], rows)
+
+            rows = s.get(order=[("a", "ASC")])
+            self.assertEqual([a, b, c], rows)
+
+            rows = s.get(order=[("a", "DESC")])
+            self.assertEqual([c, b, a], rows)
+
+
+class TestDelete(Basic):
+    def test_basic_delete(self):
+        with DictLiteStore() as s:
+            a = {"a": 0, "b": "y"}
+            b = {"a": 2, "b": "x"}
+            c = {"a": 20917203912, "b": "z"}
+
+            s.store(a)
+            s.store(b)
+            s.store(c)
+
+            rows = s.get()
+
+            self.assertEqual(len(rows), 3)
+            self.assertEqual([a, b, c], rows)
+
+            s.delete(("a", "==", 0))
+
+            rows = s.get()
+
+            self.assertEqual(len(rows), 2)
+            self.assertEqual([b, c], rows)
+
+            s.delete()
+
+            rows = s.get()
+
+            self.assertEqual(len(rows), 0)
+
 # And the update tests:
 
 class TestUpdates(Basic):
@@ -149,6 +229,16 @@ class TestUpdates(Basic):
             c = s.get()
 
             self.assertEqual(c, [ROW1, ROW1])
+
+    def test_getting_rows_using_NoJSON(self):
+        with DictLiteStore() as s:
+            s.store(ROW1)
+            s.store(ROW2)
+
+            c = s.get(("col1", "==", NoJSON('"data1"')))
+
+            self.assertEqual(c, [ROW1])
+
 
     def test_rows_with_different_columns(self):
 
@@ -266,6 +356,11 @@ class TestUpdates(Basic):
 
                 c = s.get()
                 self.assertEqual(c, [{x:'UPDATED'}])
+
+    def test_invalid_operator(self):
+        with DictLiteStore() as s:
+            with self.assertRaises(KeyError):
+                s.update(UPDATE1, True, ("thing", '"should break"', "value"))
 
 
 
